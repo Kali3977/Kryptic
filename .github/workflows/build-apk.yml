@@ -15,6 +15,10 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -25,42 +29,39 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Configure preinstalled Android SDK
+        run: |
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
       - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses
-
-      - name: Install required Android SDK packages
         run: |
-          sdkmanager --install \
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      - name: Install Android SDK packages
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
             "platforms;android-35" \
             "build-tools;35.0.0" \
             "platform-tools"
-
-      - name: Verify Android SDK installation
-        run: |
-          sdkmanager --list_installed
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Check project files
+      - name: Verify project structure
         run: |
-          echo "Checking Android project files..."
           test -f settings.gradle
           test -f build.gradle
           test -f app/build.gradle
-          echo "Project files found."
+          echo "Android project files found."
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify APK exists
+      - name: Verify APK
         run: |
           test -f app/build/outputs/apk/debug/app-debug.apk
           ls -lh app/build/outputs/apk/debug/app-debug.apk
